@@ -125,6 +125,9 @@ git branch -d <feature-branch>
 
 ### Option 2: Push and Create PR
 
+If the project keeps a version number, a changelog, or user-facing docs,
+use superpowers:preparing-a-release before pushing.
+
 ```bash
 git push -u origin <feature-branch>
 # From a detached HEAD, name the new branch on the remote:
@@ -138,6 +141,8 @@ present, and report the URL to your human partner.
 
 Keep the worktree — your human partner iterates on PR feedback there.
 When review comments arrive, use superpowers:receiving-code-review.
+When the PR is ready to merge — and, if the project deploys, to ship —
+use superpowers:landing-and-deploying.
 
 ### Option 3: Keep As-Is
 

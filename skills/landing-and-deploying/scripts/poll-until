@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Re-run a read-only status command until it succeeds, fails for good, or
+# times out — with bounded output, so a long wait costs a few lines of
+# context instead of one line per poll.
+#
+# Success: the command exits 0.
+# Failure: with --pending-exit, any other non-zero exit code; and, with
+#          --fail-pattern, output matching it (an extended regex, matched
+#          case-insensitively). Prefer exit codes: summary lines such as
+#          "0 failing" defeat naive patterns.
+# Anything else: still pending; wait --interval seconds and run it again.
+#
+# Usage: poll-until [--interval SEC] [--timeout SEC] [--every SEC]
+#                   [--pending-exit CODE] [--fail-pattern REGEX]
+#                   -- COMMAND [ARGS...]
+#   --interval      seconds between runs (default 30)
+#   --timeout       give up after this many seconds (default 900); keep it
+#                   under your harness's command time limit, or run this in
+#                   the background
+#   --every         print a progress line at most this often (default 120)
+#   --pending-exit  the exit code that means "not done yet" (repeatable);
+#                   e.g. `gh pr checks` exits 8 while checks are pending
+# Exit: 0 succeeded, 1 failed (non-pending exit or --fail-pattern match),
+#       124 timed out, 2 usage.
+# The last run's output tail is printed in every case.
+set -euo pipefail
+
+usage() {
+  echo "usage: poll-until [--interval SEC] [--timeout SEC] [--every SEC] [--pending-exit CODE] [--fail-pattern REGEX] -- COMMAND [ARGS...]" >&2
+  exit 2
+}
+
+interval=30
+timeout=900
+every=120
+fail_pattern=""
+pending_exits=""
+
+is_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --interval) [ $# -ge 2 ] && is_num "$2" || usage; interval=$2; shift 2 ;;
+    --timeout) [ $# -ge 2 ] && is_num "$2" || usage; timeout=$2; shift 2 ;;
+    --every) [ $# -ge 2 ] && is_num "$2" || usage; every=$2; shift 2 ;;
+    --fail-pattern) [ $# -ge 2 ] || usage; fail_pattern=$2; shift 2 ;;
+    --pending-exit) [ $# -ge 2 ] && is_num "$2" || usage; pending_exits="$pending_exits $2 "; shift 2 ;;
+    --) shift; break ;;
+    *) usage ;;
+  esac
+done
+[ $# -ge 1 ] || usage
+
+start=$(date +%s)
+last_progress=$start
+attempts=0
+out=""
+
+while :; do
+  attempts=$((attempts + 1))
+  rc=0
+  out=$("$@" 2>&1) || rc=$?
+  now=$(date +%s)
+  elapsed=$((now - start))
+
+  if [ "$rc" -eq 0 ]; then
+    printf '%s\n' "$out" | tail -n 5
+    echo "poll-until: succeeded after ${elapsed}s ($attempts runs)"
+    exit 0
+  fi
+  if [ -n "$pending_exits" ]; then
+    case "$pending_exits" in
+      *" $rc "*) ;;
+      *)
+        printf '%s\n' "$out" | tail -n 10
+        echo "poll-until: failed after ${elapsed}s ($attempts runs): exit $rc is not a pending code" >&2
+        exit 1
+        ;;
+    esac
+  fi
+  if [ -n "$fail_pattern" ] && printf '%s\n' "$out" | grep -qiE -- "$fail_pattern"; then
+    printf '%s\n' "$out" | tail -n 10
+    echo "poll-until: failed after ${elapsed}s ($attempts runs): output matched /$fail_pattern/" >&2
+    exit 1
+  fi
+  if [ "$elapsed" -ge "$timeout" ]; then
+    printf '%s\n' "$out" | tail -n 10
+    echo "poll-until: timed out after ${elapsed}s ($attempts runs); still pending" >&2
+    exit 124
+  fi
+  if [ $((now - last_progress)) -ge "$every" ]; then
+    echo "poll-until: still pending after ${elapsed}s ($attempts runs)"
+    last_progress=$now
+  fi
+  sleep "$interval"
+done

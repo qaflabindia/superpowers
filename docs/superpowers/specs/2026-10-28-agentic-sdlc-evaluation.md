@@ -185,7 +185,8 @@ The writing-plans handoff makes the real choice. Making SDD's description match 
   - `task-verify -C` keeps the ledger in the plan's own checkout.
   - Serial execution stays the default.
 - F11 is done in part: SDD completion lines record `models:` and fix rounds, and diagnosing's cost-and-time prompt cites them when a ledger survives. Finish deletes the ledger, so this only helps for runs still in flight.
-- F10 is not done: it belongs in a separate plugin.
+- F10 is addressed in this fork only, by four generic skills adapted from the gstack release skills (`setup-deploy`, `ship` + `document-release`, `land-and-deploy`, `canary`): configuring-deploys, preparing-a-release, landing-and-deploying (with `scripts/poll-until`) and verifying-a-deploy (with `scripts/http-probe`). They hook in at finishing-a-development-branch Option 2. Upstream AGENTS.md puts deploy work outside core, so these are not for an upstream PR; ship them as a separate plugin if they are ever shared.
+- gstack skills assessed and not adapted: `health` (overlaps verification-before-completion), `cso` (a full security audit; F9's trust-boundary review covers the SDLC part), `retro` (team analytics, not a gate), `benchmark` (needs gstack's browse daemon; its relative-threshold rule is in verifying-a-deploy), `careful` / `guard` (PreToolUse hooks; the SDD stop rules cover the agent side).
 - SDD `SKILL.md` is back to 19,056 bytes, 944 under the 20,000 limit. The next SDD change should move something out first.
 - No behaviour evals have been run for any of this.
 

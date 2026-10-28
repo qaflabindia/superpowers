@@ -360,6 +360,12 @@ Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and the rest of t
 - **finishing-a-development-branch** - Merge/PR decision workflow
 - **subagent-driven-development** - Fast iteration with two-stage review (spec compliance, then code quality)
 
+**Release and Deploy**
+- **configuring-deploys** - Record how a project releases and deploys, once, in its instructions file
+- **preparing-a-release** - Version, changelog, and docs brought in line before the branch is pushed
+- **landing-and-deploying** - Wait for CI, merge on your go, follow the deploy, verify, roll back on your go
+- **verifying-a-deploy** - Read-only check of the running system against a baseline, with a verdict
+
 **Meta**
 - **writing-skills** - Create new skills following best practices (includes testing methodology)
 - **using-superpowers** - Introduction to the skills system
