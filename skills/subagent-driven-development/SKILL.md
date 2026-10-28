@@ -218,7 +218,7 @@ from the suite budget you set at pre-flight
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** First verify the claim yourself: `bash scripts/task-verify PLAN_FILE N -- <the report's test command>`. It re-runs the command, keeps the output in the workspace, prints five lines, and ledgers `Task <N>: tests verified at <head7>` — never a completion line. A failing run is a Critical finding: enter the fix loop with its tail. A report with no test command is NEEDS_CONTEXT. Then generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
+**DONE:** First verify the claim yourself: `bash scripts/task-verify PLAN_FILE N -- <the report's test command>`. It re-runs the command, keeps the output in the workspace, prints five lines, and ledgers `Task <N>: tests verified at <head7>` — never a completion line. A failing run is a Critical finding: enter the fix loop with its tail. A report with no test command is NEEDS_CONTEXT. If this is a transcription task (see below), stop here: go to step 5. Otherwise generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
 
 **Any other status** (DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED): read
 [references/handling-reports.md](references/handling-reports.md) and follow
@@ -231,10 +231,17 @@ rush it into implementation.
 ### 3. Review the task
 
 Per-task reviews are task-scoped gates. The broad review happens once, at the
-final whole-branch review. Never skip the task review, and never accept a
-report missing either verdict — spec compliance AND task quality are both
-required. Implementer self-review never replaces the task review; both are
-needed.
+final whole-branch review. Never accept a report missing either verdict —
+spec compliance AND task quality are both required. Implementer self-review
+never replaces the task review; both are needed.
+
+**Transcription tasks skip the task review.** A task is a transcription task
+when its brief contains the complete code to write, it touches one or two
+files, and `task-verify` passed. The plan already did the thinking and the
+verified test run is the gate; a fresh reviewer re-reading a diff it could
+have predicted from the brief is a full context spent for little. Its
+review moves to the final whole-branch review. Every other task gets the
+task review — never skip it on a task that needed judgment.
 
 - Hand the reviewer its diff as a file: run this skill's
   `bash scripts/review-package PLAN_FILE BASE HEAD` and pass the reviewer the file path
@@ -290,6 +297,8 @@ message as your other bookkeeping:
 - `Task <N>: complete (commits <base7>..<head7>, review clean; models: impl <m>, review <m>, rounds <R>)`
 - `Task <N>: complete (commits <base7>..<head7>, <K> parked; models: …)`
   after a tripped breaker
+- `Task <N>: complete (commits <base7>..<head7>, transcription, review deferred to final; models: impl <m>)`
+  for a transcription task
 
 `models:` names the model you dispatched for each seat (`impl <m1>→<m2>` when
 rounds 4-5 escalated) and the fix rounds run; it is how a later cost

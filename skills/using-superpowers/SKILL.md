@@ -8,11 +8,9 @@ If you were dispatched as a subagent to execute a specific task, ignore this ski
 </SUBAGENT-STOP>
 
 <EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+If a skill applies to what you are doing, you MUST invoke it. You do not have a choice, and you cannot rationalize your way out of it.
 
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
-
-This is not negotiable. You cannot rationalize your way out of this.
+A skill applies when the work will change something: building, modifying, fixing, debugging, planning, reviewing, releasing. It does not apply to a question you can answer without changing anything, or to an edit where the request already specifies everything ("rename X to Y", "make the icon cornflower blue") — do those directly. Loading a process skill you will not follow costs your human partner tokens and buys nothing.
 </EXTREMELY-IMPORTANT>
 
 ## The Rule
@@ -36,7 +34,7 @@ These thoughts mean STOP—you're rationalizing:
 
 | Thought | Reality |
 |---------|---------|
-| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "This is just a simple question" | If answering it means changing, debugging, or planning anything, it is a task. Check for skills. |
 | "I need more context first" | Skill check comes BEFORE clarifying questions. |
 | "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
 | "I can check git/files quickly" | Files lack conversation context. Check for skills. |

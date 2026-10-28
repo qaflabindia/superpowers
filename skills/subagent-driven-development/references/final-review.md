@@ -12,7 +12,8 @@ on the most capable available model (see SKILL.md's Model Selection), using
 superpowers:requesting-code-review's
 [code-reviewer.md](../../requesting-code-review/code-reviewer.md). Point it at
 the ledger's deferred-minor and parked lines so it can triage which must be
-fixed before merge.
+fixed before merge, and at the tasks ledgered "review deferred to final":
+those commits had no task review, so it checks them against their briefs.
 
 If the final whole-branch review returns findings, dispatch ONE fix subagent
 with the complete findings list — not one fixer per finding.
