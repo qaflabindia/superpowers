@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Independently re-run the test command an implementer reported, before the
+# task review is dispatched. The implementer's report is a claim; this run is
+# the controller's evidence. The full output stays in the workspace and only
+# its tail is printed, so the check costs the controller a few lines of
+# context.
+#
+# Records a ledger line on success — never a completion line: the task is not
+# complete until its review is clean.
+#
+# Usage: task-verify [-C DIR] PLAN_FILE TASK_NUMBER -- TEST_COMMAND [ARGS...]
+#   -C DIR runs the command in DIR (a parallel-wave task's worktree) and
+#   records DIR's HEAD, while the ledger stays in the plan workspace of the
+#   checkout you run this from.
+# Ledger line on success:
+#   Task <N>: tests verified at <head7> — <command> → <last line>
+# Exit: the test command's exit status.
+set -euo pipefail
+
+usage() {
+  echo "usage: task-verify [-C DIR] PLAN_FILE TASK_NUMBER -- TEST_COMMAND [ARGS...]" >&2
+  exit 2
+}
+
+run_dir=.
+if [ "${1:-}" = "-C" ]; then
+  [ $# -ge 2 ] && [ -d "$2" ] || usage
+  run_dir=$2
+  shift 2
+fi
+if [ $# -lt 4 ] || [ "$3" != "--" ]; then
+  usage
+fi
+
+plan=$1
+n=$2
+shift 3
+here="$(cd "$(dirname "$0")" && pwd)"
+
+dir=$("${BASH:-bash}" "$here/sdd-workspace" "$plan")
+ledger="$dir/progress.md"
+head=$(git -C "$run_dir" rev-parse --short=7 HEAD)
+log="$dir/task-${n}-verify-${head}.log"
+
+# Render the command the way a person would type it, for the ledger line.
+cmd=""
+for a in "$@"; do
+  case "$a" in
+    *[[:space:]\"\;\|\&]*) cmd="$cmd '$a'" ;;
+    *) cmd="$cmd $a" ;;
+  esac
+done
+cmd=${cmd# }
+
+rc=0
+(cd "$run_dir" && "$@") > "$log" 2>&1 || rc=$?
+
+tail -n 5 "$log"
+if [ "$rc" -ne 0 ]; then
+  echo "task-verify: test command exited $rc at $head; Task $n NOT verified (full output: $log)" >&2
+  exit "$rc"
+fi
+
+last=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1) || last="(no output)"
+[ -f "$ledger" ] || printf '# SDD ledger — plan: %s\n' "$plan" > "$ledger"
+line="Task $n: tests verified at $head — $cmd → $last"
+printf '%s\n' "$line" >> "$ledger"
+echo "ledger: $line"

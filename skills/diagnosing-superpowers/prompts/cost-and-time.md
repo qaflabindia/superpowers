@@ -22,7 +22,10 @@ Account for where tokens and wall-clock went.
    established during discovery. Report available before/after counters and
    what the session was doing when each fired; mark unsupported fields absent.
 5. Associated sessions: count them and report supported usage, duration, and
-   dispatching turn for each.
+   dispatching turn for each. If the case file lists a surviving plan ledger
+   (`.superpowers/sdd/<plan>/progress.md`), its `Task <N>: complete` lines
+   may carry `models:` (model per seat, fix rounds run); cite them to
+   attribute subagent cost to roles.
 6. Report the turns, subagents, tools, or repeats that dominate the
    totals, with numbers. Do not speculate about why a
    turn was expensive beyond what the transcript shows.

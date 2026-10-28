@@ -3,7 +3,8 @@
 # the brief and records BASE in one call; scripts/task-done runs the task's
 # test command, records the result in the ledger, and refuses to record a
 # failing task; scripts/suite-run (shared with SDD) records tree-keyed suite
-# evidence only for a green run on a clean, unchanged tree.
+# evidence only for a green run on a clean, unchanged tree; scripts/task-verify
+# (SDD) re-runs an implementer's test command without marking the task complete.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -209,6 +210,64 @@ PLAN
         echo "    got: $out"
     fi
     ( cd "$repo" && git checkout -q -- work.txt )
+
+    # --- task-verify (SDD): records verification, never completion ---
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/task-verify" plan.md 3 -- sh -c 'echo "5 passed"' 2>&1)" || rc=$?
+    local expected4="Task 3: tests verified at ${head2:0:7} — sh -c 'echo \"5 passed\"' → 5 passed"
+    if [[ "$rc" -eq 0 ]] && grep -qF "$expected4" "$ledger"; then
+        pass "task-verify records the controller's own test run"
+    else
+        fail "task-verify records the controller's own test run (rc=$rc)"
+        echo "    expected: $expected4"
+        echo "    ledger:"; sed 's/^/      /' "$ledger" 2>/dev/null || echo "      (missing)"
+    fi
+    if ! grep -q "^Task 3: complete" "$ledger"; then
+        pass "task-verify never writes a completion line"
+    else
+        fail "task-verify never writes a completion line"
+    fi
+    if [[ -s "$repo/.superpowers/sdd/plan/task-3-verify-${head2:0:7}.log" ]]; then
+        pass "task-verify keeps the full output in the workspace"
+    else
+        fail "task-verify keeps the full output in the workspace"
+    fi
+
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/task-verify" plan.md 4 -- sh -c 'echo "2 failed"; exit 1' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 1 ]] && ! grep -q "^Task 4:" "$ledger" && [[ "$out" == *"2 failed"* ]]; then
+        pass "task-verify returns the failing status, shows it, and records nothing"
+    else
+        fail "task-verify returns the failing status, shows it, and records nothing (rc=$rc)"
+        echo "    got: $out"
+    fi
+
+    rc=0
+    (cd "$repo" && "$SDD_SCRIPTS/task-verify" plan.md 3 >/dev/null 2>&1) || rc=$?
+    if [[ "$rc" -eq 2 ]]; then
+        pass "task-verify without a command errors with exit 2"
+    else
+        fail "task-verify without a command errors with exit 2 (got $rc)"
+    fi
+
+    # --- task-verify -C: runs in a wave worktree, ledgers in the plan checkout ---
+    local wt="$TEST_ROOT/wave-task-5"
+    ( cd "$repo" && git worktree add -q -b sdd/plan/task-5 "$wt" HEAD \
+        && cd "$wt" && echo z > wave.txt && git add wave.txt \
+        && git "${git_id[@]}" commit -qm "task 5" )
+    local wt_head
+    wt_head="$(git -C "$wt" rev-parse HEAD)"
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/task-verify" -C "$wt" plan.md 5 -- sh -c 'test -f wave.txt && echo "1 passed"' 2>&1)" || rc=$?
+    local expected5="Task 5: tests verified at ${wt_head:0:7} — sh -c 'test -f wave.txt && echo \"1 passed\"' → 1 passed"
+    if [[ "$rc" -eq 0 ]] && grep -qF "$expected5" "$ledger" && [[ ! -e "$wt/.superpowers" ]]; then
+        pass "task-verify -C runs in the worktree and ledgers in the plan checkout"
+    else
+        fail "task-verify -C runs in the worktree and ledgers in the plan checkout (rc=$rc)"
+        echo "    got: $out"
+        echo "    ledger:"; sed 's/^/      /' "$ledger" 2>/dev/null || echo "      (missing)"
+    fi
+    ( cd "$repo" && git worktree remove --force "$wt" )
 
     echo
     if [[ "$FAILURES" -eq 0 ]]; then

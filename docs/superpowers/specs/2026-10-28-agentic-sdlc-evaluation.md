@@ -172,7 +172,21 @@ The writing-plans handoff makes the real choice. Making SDD's description match 
   - `subagent-driven-development/scripts/suite-run` records `Suite: green on tree <T>`, but only for a green run on a tree that is clean and unchanged after the run.
   - `references/finish.md` makes the executor's own full-suite run the final check, then carries that line forward.
   - finishing Step 1 cites the line instead of re-running when `HEAD^{tree}` matches and the worktree is clean.
-  - This also covers the final-tree part of F6: the controller now runs the suite itself before finishing. F6's per-task check is still open.
+  - This also covers the final-tree part of F6: the controller now runs the suite itself before finishing.
+- Step 4 (F6, per task) is done:
+  - Implementers now report the exact test command they ran.
+  - On DONE, and after each fix round, the controller re-runs that command with the new `scripts/task-verify`. A red result is a Critical finding.
+- Step 5 (F12, F9) is done:
+  - SDD's description now names only its trigger (your human partner chose subagent-driven execution and a subagent tool is available), following `writing-skills/references/discovery.md`.
+  - Review Focus must name any trust boundary the software crosses.
+- Step 6 (F7) is done, opt-in only:
+  - writing-plans tasks carry `Depends on:`.
+  - `references/parallel-waves.md` covers building waves at pre-flight, one worktree per task, a review per task, landing in task order, and re-queuing a task on a merge conflict.
+  - `task-verify -C` keeps the ledger in the plan's own checkout.
+  - Serial execution stays the default.
+- F11 is done in part: SDD completion lines record `models:` and fix rounds, and diagnosing's cost-and-time prompt cites them when a ledger survives. Finish deletes the ledger, so this only helps for runs still in flight.
+- F10 is not done: it belongs in a separate plugin.
+- SDD `SKILL.md` is back to 19,056 bytes, 944 under the 20,000 limit. The next SDD change should move something out first.
 - No behaviour evals have been run for any of this.
 
 **For sending changes upstream:** AGENTS.md requires one problem per PR, a problem your human partner actually hit, a search for duplicate PRs, and eval evidence for skill-content changes. F1 and F4 are the most defensible as standalone bug fixes, and only if you have hit them in a real session. F5–F7 are design changes and should start as an issue or discussion, not a PR.

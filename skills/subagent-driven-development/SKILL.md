@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks in the current session
+description: Use when executing an implementation plan in the current session and your human partner chose subagent-driven execution, with a subagent tool available
 ---
 
 # Subagent-Driven Development
@@ -204,7 +204,11 @@ and fix-round diffs need it.
   a pointer to that ledger entry in the dispatch.
 - Record the implementer's agent identity from the dispatch result —
   fix-loop rounds 1-3 resume this agent.
-- Never dispatch multiple implementation subagents in parallel (conflicts).
+- Never dispatch multiple implementation subagents in parallel (conflicts),
+  unless your human partner asked for parallel execution: then read
+  [references/parallel-waves.md](references/parallel-waves.md) at
+  pre-flight and follow it — separate worktrees, a review per task, landing
+  in task order.
 
 Template: [implementer-prompt.md](implementer-prompt.md)
 
@@ -212,7 +216,7 @@ Template: [implementer-prompt.md](implementer-prompt.md)
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** Generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
+**DONE:** First verify the claim yourself: `bash scripts/task-verify PLAN_FILE N -- <the report's test command>`. It re-runs the command, keeps the output in the workspace, prints five lines, and ledgers `Task <N>: tests verified at <head7>` — never a completion line. A failing run is a Critical finding: enter the fix loop with its tail. A report with no test command is NEEDS_CONTEXT. Then generate the review package (`bash scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
 
 **Any other status** (DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED): read
 [references/handling-reports.md](references/handling-reports.md) and follow
@@ -281,9 +285,13 @@ When the review comes back clean — or every open finding is parked with a
 ruling at the cap — append the completion line to the ledger in the same
 message as your other bookkeeping:
 
-- `Task <N>: complete (commits <base7>..<head7>, review clean)`
-- `Task <N>: complete (commits <base7>..<head7>, <K> parked)` after a
-  tripped breaker
+- `Task <N>: complete (commits <base7>..<head7>, review clean; models: impl <m>, review <m>, rounds <R>)`
+- `Task <N>: complete (commits <base7>..<head7>, <K> parked; models: …)`
+  after a tripped breaker
+
+`models:` names the model you dispatched for each seat (`impl <m1>→<m2>` when
+rounds 4-5 escalated) and the fix rounds run; it is how a later cost
+diagnosis sees which seats were spent where.
 
 Then mark the todo complete and move on. Never move to the next task while
 the review has open Critical/Important issues that are neither fixed nor

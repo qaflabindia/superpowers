@@ -142,6 +142,8 @@ Subagent (general-purpose):
     - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
     - Commits created (short SHA + subject)
     - One-line test summary (e.g. "14/14 passing, output pristine")
+    - Test command: the exact command that summary came from, runnable
+      from the repo root (the controller re-runs it before review)
     - Your concerns, if any
     - The report file path
 
