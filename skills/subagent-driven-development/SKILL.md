@@ -100,41 +100,15 @@ digraph process {
 
 ## Setup
 
-Ensure the work happens in an isolated workspace: use
-superpowers:using-git-worktrees to create one or verify the existing one.
-Never start implementation on a main/master branch without your human
-partner's explicit consent.
-
-Conversation memory does not survive compaction. In real sessions,
-controllers that lost their place have re-dispatched entire completed task
-sequences — the single most expensive failure observed. Track progress in
-a ledger file, not only in todos.
-
-- Each plan owns a workspace: at skill start, run this skill's
-  `bash scripts/sdd-workspace PLAN_FILE` — it prints the plan's git-ignored
-  directory (under `<repo-root>/.superpowers/sdd/`), home to
-  every artifact for THIS plan: ledger, briefs, reports, review packages.
-  Another plan's directory is never yours to read or write.
-- Check for this plan's ledger at `<workspace>/progress.md`. If one exists,
-  read [references/resuming.md](references/resuming.md) before anything
-  else: it says whose ledger it is and where to resume.
-- Create the ledger with its identity as the first line:
-  `# SDD ledger — plan: <plan file path>`.
-- The ledger is your recovery map: the commits it names exist in git even
-  when your context no longer remembers creating them. After compaction,
-  trust the ledger and `git log` over your own recollection.
-- `git clean -fdx` will destroy the workspace (it's git-ignored scratch); if
-  that happens, recover from `git log`.
-
-Read the plan once, note its context and Global Constraints, and create a
-todo per task. If the plan names a Spec, read that too: the spec is the
-authority the plan argues from, and conflicts inside the plan resolve
-against it. A plan with no reachable spec gets a ledger note saying so —
-rulings made without one are provisional.
-
-Before dispatching Task 1, read [references/preflight.md](references/preflight.md)
-and run the conflict scan it describes. Its table and rulings go in the
-ledger.
+At skill start, before anything else, read
+[references/workspace.md](references/workspace.md) and follow it: isolated
+worktree, this plan's workspace (`bash scripts/sdd-workspace PLAN_FILE`),
+the ledger, the plan and spec, then the pre-flight scan in
+[references/preflight.md](references/preflight.md). Conversation memory
+does not survive compaction; controllers that lost their place have
+re-dispatched entire completed task sequences. The ledger at
+`<workspace>/progress.md` is the record — after compaction, trust it and
+`git log` over your own recollection.
 
 ## Model Selection
 

@@ -107,59 +107,23 @@ digraph process {
 
 ## Setup
 
-Ensure the work happens in an isolated workspace: use
-superpowers:using-git-worktrees to create one or verify the existing one.
-Never start implementation on a main/master branch without your human
-partner's explicit consent.
-
-Conversation memory does not survive compaction. An inline executor that
-loses its place re-implements tasks whose commits already exist — the same
-failure as a controller re-dispatching them, paid for in your own context.
-Track progress in a ledger file, not only in todos. Harness todos are a
-live view; the ledger is the record.
-
-The workspace and ledger are shared with superpowers:subagent-driven-development
-— same directory, same format — so a plan can change executors mid-flight
-and the new one resumes from the same ledger.
-
-- Each plan owns a workspace: at skill start, run
-  `../subagent-driven-development/scripts/sdd-workspace PLAN_FILE` — it
-  prints the plan's git-ignored directory
-  (`<repo-root>/.superpowers/sdd/<plan-basename>/`), home to every
-  artifact for THIS plan: ledger, briefs, review packages. Another plan's
-  directory is never yours to read or write.
-- Check for this plan's ledger at `<workspace>/progress.md`. If its first
-  line names your plan file, tasks with a `Task <N>: complete` line are
-  DONE — do not redo them; resume at the first task without one. Their
-  commits exist in git even when your context no longer remembers making
-  them: after compaction, trust the ledger and `git log` over your own
-  recollection. A ledger whose first line names a different plan file is
-  another plan's progress: leave it and start your own, fresh.
-- Create the ledger with its identity as the first line:
-  `# SDD ledger — plan: <plan file path>`.
-- `git clean -fdx` will destroy the workspace (it's git-ignored scratch);
-  if that happens, recover from `git log`.
-
-Read the plan once, note its context and Global Constraints, and create a
-todo per task. If the plan names a Spec, read that too: the spec is the
-authority the plan argues from, and conflicts inside the plan resolve
-against it. A plan with no reachable spec gets a ledger note saying so —
-rulings made without one are provisional.
+At skill start, before anything else, read
+[../subagent-driven-development/references/workspace.md](../subagent-driven-development/references/workspace.md)
+and follow it: isolated worktree, this plan's workspace
+(`../subagent-driven-development/scripts/sdd-workspace PLAN_FILE`), the
+ledger, the plan and spec, then the pre-flight scan in
+[../subagent-driven-development/references/preflight.md](../subagent-driven-development/references/preflight.md)
+(its executing-plans rules). The workspace and ledger are shared with
+superpowers:subagent-driven-development, so a plan can change executors
+mid-flight. Conversation memory does not survive compaction; an inline
+executor that loses its place re-implements tasks whose commits already
+exist. After compaction, trust the ledger and `git log` over your own
+recollection.
 
 **REQUIRED SUB-SKILL:** load superpowers:test-driven-development now,
 before Task 1. It governs every step of every task below; a plan whose
 steps already say "write the failing test first" does not exempt you
 from reading it.
-
-Before Task 1, scan the plan for conflicts between tasks. The plan's
-Interfaces blocks tell you where to look: for every task that consumes
-what an earlier task produces, one ledger row — the two tasks, what one
-produces against what the other consumes, and what you found. Tasks that
-share nothing get no row; a plan whose tasks share nothing gets the single
-line `Pre-flight: no shared interfaces`. Rule on each conflict a row
-surfaces with the spec as the binding authority, record the ruling beside
-its row, and start Task 1. Each task's own text is checked when you read
-its brief, not here.
 
 ## The Task Loop
 
@@ -173,7 +137,9 @@ in the workspace and read its tail; read a brief, not the whole plan.
   path and BASE (the commit the task's range is cut from) in one call.
   Read the brief for every task, including ones you remember from setup:
   what you remember is a summary, the brief has the exact values,
-  signatures, and test cases.
+  signatures, and test cases. Check that the brief agrees with itself (its
+  tests against its code, the files it creates against the files it later
+  touches) before the first step; rule on and ledger any disagreement.
 - Mark the task's todo in_progress.
 
 Every tool call is a turn that re-reads your whole context. Bookkeeping
@@ -290,18 +256,10 @@ in the rulings list. There is no second fix pass.
 
 ## Finish
 
-Before you delete anything, collect every ledger line containing
-`Ruling:` into your final message under "Rulings I made", in the order you
-made them, each with what it costs if wrong, and every `minor (deferred)`
-line under "Deferred minors". Both lists are exhaustive. Your final
-message is the only place the decisions you took on your human partner's
-behalf — and the findings you chose not to act on — reach them.
-
-When the final review is clean and its fixes are committed, delete this
-plan's workspace directory — the git history is the record now. Sibling
-directories belong to other plans; leave them alone.
-
-Use superpowers:finishing-a-development-branch.
+When the final review is clean and its fixes are committed, read
+[../subagent-driven-development/references/finish.md](../subagent-driven-development/references/finish.md)
+and follow it: the "Rulings I made" and "Deferred minors" lists, deleting
+the workspace, and handing off to superpowers:finishing-a-development-branch.
 
 ## Common Rationalizations
 

@@ -101,22 +101,27 @@ cd "$path"
 
 ## Step 2: Project Setup
 
-Auto-detect and run appropriate setup:
+Install dependencies with the tool the project already uses. The lockfile
+names it; the manifest alone does not:
 
-```bash
-# Node.js
-if [ -f package.json ]; then npm install; fi
+| Lockfile | Command |
+|----------|---------|
+| `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+| `yarn.lock` | `yarn install --frozen-lockfile` (Yarn 2+: `yarn install --immutable`) |
+| `bun.lock` / `bun.lockb` | `bun install --frozen-lockfile` |
+| `package-lock.json` | `npm ci` |
+| `uv.lock` | `uv sync` |
+| `poetry.lock` | `poetry install` |
+| `Cargo.lock` / `Cargo.toml` | `cargo build` |
+| `go.sum` / `go.mod` | `go mod download` |
+| `requirements.txt` (no other Python lockfile) | `pip install -r requirements.txt` |
 
-# Rust
-if [ -f Cargo.toml ]; then cargo build; fi
-
-# Python
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-if [ -f pyproject.toml ]; then poetry install; fi
-
-# Go
-if [ -f go.mod ]; then go mod download; fi
-```
+The project's own instructions or setup script (README, CONTRIBUTING, a
+`Makefile`/`justfile` setup target) beat this table. A manifest with no
+lockfile (`package.json` alone, `pyproject.toml` alone) is ambiguous: ask
+your human partner which tool to use rather than guess. The wrong installer
+writes a second lockfile or rewrites the existing one, and that change sits
+in the diff before Task 1 starts.
 
 ## Step 3: Verify Clean Baseline
 
@@ -154,7 +159,8 @@ Ready to implement <feature-name>
 | Directory not ignored | Add to .gitignore + commit |
 | Permission error on create | Sandbox fallback, work in place |
 | Tests fail during baseline | Report failures + ask |
-| No package.json/Cargo.toml | Skip dependency install |
+| Manifest without lockfile | Ask which installer |
+| No manifest | Skip dependency install |
 
 ## Common Rationalizations
 

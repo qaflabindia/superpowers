@@ -124,6 +124,7 @@ print when you push — following the repo's PR template and conventions if
 present, and report the URL to your human partner.
 
 Keep the worktree — your human partner iterates on PR feedback there.
+When review comments arrive, use superpowers:receiving-code-review.
 
 ### Option 3: Keep As-Is
 

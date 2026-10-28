@@ -24,6 +24,12 @@ Subagent (general-purpose):
 
     **Base:** [BASE_SHA]
     **Head:** [HEAD_SHA]
+    **Review package:** [REVIEW_PACKAGE]
+
+    The review package is one file holding the commit list, stat summary,
+    and full diff with context for this range. Read it first; it is the
+    diff under review. Use git commands only for context the package lacks
+    (a file's surrounding code, history). Only if no package path is given:
 
     ```bash
     git diff --stat [BASE_SHA]..[HEAD_SHA]
@@ -156,6 +162,7 @@ Subagent (general-purpose):
 - `[PLAN_OR_REQUIREMENTS]` — what it should do (plan file path, task text, or requirements)
 - `[BASE_SHA]` — starting commit
 - `[HEAD_SHA]` — ending commit
+- `[REVIEW_PACKAGE]` — path to the review package file for BASE..HEAD, or "none"
 
 **Reviewer returns:** Strengths, Issues (Critical / Important / Minor), Recommendations, Assessment
 

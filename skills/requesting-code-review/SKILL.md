@@ -12,9 +12,11 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 ## When to Request Review
 
 **Mandatory:**
-- After each task in subagent-driven development
 - After completing major feature
 - Before merge to main
+- The final whole-branch review of superpowers:subagent-driven-development
+  and superpowers:executing-plans (their per-task reviews use SDD's own
+  task-reviewer template, not this one)
 
 **Optional but valuable:**
 - When stuck (fresh perspective)
@@ -25,21 +27,33 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 
 **1. Get git SHAs:**
 ```bash
-BASE_SHA=$(git rev-parse HEAD~1)  # or: git merge-base origin/main HEAD
+BASE_SHA=<commit you recorded before the work started>  # or, for a whole branch: git merge-base <base-branch> HEAD
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-**2. Dispatch code reviewer subagent:**
+Never `HEAD~1`: it silently drops all but the last commit of multi-commit work.
 
-Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md)
+**2. Package the diff as a file:**
+
+With a plan, run `bash ../subagent-driven-development/scripts/review-package PLAN_FILE BASE_SHA HEAD_SHA`
+and keep the path it prints. Without one, redirect `git log --oneline`, `git diff --stat`,
+and `git diff -U10` for the range into one uniquely named file. The diff stays out of
+your context; the reviewer reads it in one call.
+
+**3. Dispatch code reviewer subagent:**
+
+Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md).
+Specify its model explicitly — an omitted model inherits your session's. Scale it to the
+diff's size and risk; a whole-branch review takes the most capable available model.
 
 **Placeholders:**
-- `{DESCRIPTION}` - Brief summary of what you built
-- `{PLAN_OR_REQUIREMENTS}` - What it should do
-- `{BASE_SHA}` - Starting commit
-- `{HEAD_SHA}` - Ending commit
+- `[DESCRIPTION]` - Brief summary of what you built
+- `[PLAN_OR_REQUIREMENTS]` - What it should do
+- `[BASE_SHA]` - Starting commit
+- `[HEAD_SHA]` - Ending commit
+- `[REVIEW_PACKAGE]` - Path from step 2
 
-**3. Act on feedback:**
+**4. Act on feedback:**
 - Fix Critical issues immediately
 - Fix Important issues before proceeding
 - Note Minor issues for later
