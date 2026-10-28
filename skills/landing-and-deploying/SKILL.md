@@ -27,8 +27,9 @@ without asking.
   back).
 - **The PR.** From the current branch or the number your human partner
   gave. With GitHub `gh pr view --json number,state,title,url,headRefOid,baseRefName,mergeable`;
-  with GitLab `glab mr view`; without a forge CLI, ask for the URL and do
-  the merge step through your human partner. Merged or closed already:
+  other forges: [references/forges.md](references/forges.md). Without a
+  forge CLI, ask for the URL and do the merge step through your human
+  partner. Merged or closed already:
   say so and stop (a merged PR may still need superpowers:verifying-a-deploy).
 
 Long waits use this skill's `scripts/poll-until`: it re-runs a read-only
@@ -54,9 +55,10 @@ partner's go; then this skill starts over.
 Gather, then present in one message:
 
 - **CI:** each required check and its conclusion, at head `<sha7>`.
-- **Tests:** the full suite on the PR head. A `Suite: green on tree <T>`
-  line you hold counts only if `git rev-parse 'HEAD^{tree}'` equals `<T>`
-  on a clean checkout of that head; otherwise run it.
+- **Tests:** the full suite on the PR head. On a clean checkout of that
+  head, `bash <subagent-driven-development>/scripts/suite-run --lookup --
+  <full test command>` prints a recorded green run for this exact tree;
+  cite it. No record: run it (`suite-run - -- <command>` records it).
 - **Review:** approvals, unresolved threads, commits pushed after the last
   approval.
 - **Release bookkeeping:** if the project keeps a version or changelog,

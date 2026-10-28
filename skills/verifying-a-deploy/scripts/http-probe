@@ -4,18 +4,23 @@
 # lines of context. Read-only (GET only).
 #
 # Usage: http-probe [--expect CODE] [--contains TEXT] [--max-time SEC]
-#                   [--log FILE] URL [URL...]
+#                   [--log FILE] [--baseline FILE] URL [URL...]
 #   --expect     status code that counts as OK (default: any 2xx or 3xx)
 #   --contains   text the body must contain (e.g. a version or commit SHA)
 #   --max-time   per-request limit in seconds (default 15)
 #   --log        append one tab-separated line per probe:
-#                <iso-time> <url> <status> <time_ms> <bytes> <ok|fail>
-# Output per URL:  <url> status=<code> time=<ms>ms bytes=<n> ok|FAIL (<why>)
-# Exit: 0 when every URL is OK, 1 when any is not, 2 usage.
+#                <iso-time> <url> <status> <time_ms> <bytes> <ok|fail|changed>
+#   --baseline   a --log file from before the deploy; each URL is compared
+#                with its last ok line there: a different status, or a time
+#                over twice the baseline (when the baseline is 20ms or more),
+#                is CHANGED
+# Output per URL:  <url> status=<code> time=<ms>ms bytes=<n> ok|FAIL (<why>)|CHANGED (<why>)
+# Exit: 0 when every URL is OK, 1 when any FAILs, 3 when none fails but
+#       some changed against the baseline, 2 usage.
 set -euo pipefail
 
 usage() {
-  echo "usage: http-probe [--expect CODE] [--contains TEXT] [--max-time SEC] [--log FILE] URL [URL...]" >&2
+  echo "usage: http-probe [--expect CODE] [--contains TEXT] [--max-time SEC] [--log FILE] [--baseline FILE] URL [URL...]" >&2
   exit 2
 }
 
@@ -23,6 +28,7 @@ expect=""
 contains=""
 max_time=15
 log=""
+baseline=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -30,6 +36,7 @@ while [ $# -gt 0 ]; do
     --contains) [ $# -ge 2 ] || usage; contains=$2; shift 2 ;;
     --max-time) [ $# -ge 2 ] || usage; max_time=$2; shift 2 ;;
     --log) [ $# -ge 2 ] || usage; log=$2; shift 2 ;;
+    --baseline) [ $# -ge 2 ] && [ -f "$2" ] || usage; baseline=$2; shift 2 ;;
     --) shift; break ;;
     -*) usage ;;
     *) break ;;
@@ -42,6 +49,7 @@ body=$(mktemp)
 trap 'rm -f "$body"' EXIT
 
 all_ok=1
+any_changed=0
 for url in "$@"; do
   meta=$(curl -sS -o "$body" --max-time "$max_time" -w '%{http_code} %{time_total} %{size_download}' "$url" 2>/dev/null) \
     || meta="000 0 0"
@@ -61,9 +69,28 @@ EOF
     why="body lacks \"$contains\""
   fi
 
-  if [ -z "$why" ]; then
+  changed=""
+  if [ -z "$why" ] && [ -n "$baseline" ]; then
+    base=$(awk -F'\t' -v u="$url" '$2 == u && $6 == "ok" { line = $3 " " $4 } END { print line }' "$baseline")
+    if [ -n "$base" ]; then
+      read -r base_code base_ms <<EOF
+$base
+EOF
+      if [ "$code" != "$base_code" ]; then
+        changed="status was $base_code"
+      elif [ "$base_ms" -ge 20 ] && [ "$ms" -gt $((base_ms * 2)) ]; then
+        changed="${ms}ms vs baseline ${base_ms}ms"
+      fi
+    fi
+  fi
+
+  if [ -z "$why" ] && [ -z "$changed" ]; then
     verdict=ok
     echo "$url status=$code time=${ms}ms bytes=$bytes ok"
+  elif [ -z "$why" ]; then
+    verdict=changed
+    any_changed=1
+    echo "$url status=$code time=${ms}ms bytes=$bytes CHANGED ($changed)"
   else
     verdict=fail
     all_ok=0
@@ -74,4 +101,5 @@ EOF
   fi
 done
 
-[ "$all_ok" -eq 1 ]
+[ "$all_ok" -eq 1 ] || exit 1
+[ "$any_changed" -eq 0 ] || exit 3

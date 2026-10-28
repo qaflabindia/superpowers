@@ -44,8 +44,8 @@ Subagent (general-purpose):
     **While you work:** If you encounter something unexpected or unclear, **ask questions**.
     It's always OK to pause and clarify. Don't guess or make assumptions.
 
-    While iterating, run the focused test for what you're changing; run the
-    full suite once before committing, not after every edit.
+    While iterating, run the focused test for what you're changing, not the
+    full suite after every edit. [SUITE_POLICY]
 
     ## You Do Not Dispatch Subagents
 
@@ -143,7 +143,8 @@ Subagent (general-purpose):
     - Commits created (short SHA + subject)
     - One-line test summary (e.g. "14/14 passing, output pristine")
     - Test command: the exact command that summary came from, runnable
-      from the repo root (the controller re-runs it before review)
+      from the repo root (the controller re-runs it before review, unless
+      suite-run already recorded it green on your final commit)
     - Your concerns, if any
     - The report file path
 

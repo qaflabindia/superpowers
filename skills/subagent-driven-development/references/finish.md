@@ -34,8 +34,17 @@ partner's behalf — and the findings you chose not to act on — reach them.
 They read it and rework whatever you got wrong. A ruling that dies with
 the workspace was a decision made in secret.
 
+Then run `bash scripts/run-summary PLAN_FILE` (from
+subagent-driven-development's directory). It prints the run's cost lines —
+tasks, models per seat, fix rounds, suite runs and their seconds, ruling
+counts — and archives that summary with the whole ledger under the
+repository's `.git/superpowers/runs/`, outside any worktree and never
+committed. Put its output in your final message under "Run summary",
+including the `Archived:` path: that archive is what a later cost or
+behaviour diagnosis reads once the workspace is gone.
+
 Then delete this plan's workspace directory (`rm -rf <workspace>`) — the
-git history is the record now. Sibling directories belong to other plans;
+git history and the archive are the record now. Sibling directories belong to other plans;
 leave them alone.
 
 Use superpowers:finishing-a-development-branch.

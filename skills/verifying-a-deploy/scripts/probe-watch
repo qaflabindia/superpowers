@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Watch mode for verifying-a-deploy: run http-probe every --interval seconds
+# for up to --rounds rounds, logging every probe, and stop early once any URL
+# has been FAIL or CHANGED for two consecutive rounds — one bad round is a
+# blip, two is a finding. Prints one line per round (the bad probe lines in
+# full), so a ten-minute watch costs a dozen lines of context.
+#
+# Usage: probe-watch [--rounds N] [--interval SEC] --log FILE
+#                    [http-probe options] URL [URL...]
+#   --rounds    rounds to run (default 10)
+#   --interval  seconds between rounds (default 60)
+#   --log       required; every probe of every round is appended here
+#   other options (--expect, --contains, --max-time, --baseline) go to http-probe
+# Exit: 0 nothing persisted (blips are listed), 1 a FAIL persisted,
+#       3 only CHANGED findings persisted, 2 usage.
+set -euo pipefail
+
+usage() {
+  echo "usage: probe-watch [--rounds N] [--interval SEC] --log FILE [http-probe options] URL [URL...]" >&2
+  exit 2
+}
+is_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+need_num() { if [ "$1" -lt 2 ] || ! is_num "$2"; then usage; fi; }
+
+here="$(cd "$(dirname "$0")" && pwd)"
+rounds=10
+interval=60
+log=""
+probe_args=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --rounds) need_num $# "${2:-}"; rounds=$2; shift 2 ;;
+    --interval) need_num $# "${2:-}"; interval=$2; shift 2 ;;
+    --log) [ $# -ge 2 ] || usage; log=$2; shift 2 ;;
+    --expect|--contains|--max-time|--baseline)
+      [ $# -ge 2 ] || usage; probe_args+=("$1" "$2"); shift 2 ;;
+    --) shift; break ;;
+    -*) usage ;;
+    *) break ;;
+  esac
+done
+[ $# -ge 1 ] && [ -n "$log" ] || usage
+
+prev_bad=""
+blips=""
+round=0
+while [ "$round" -lt "$rounds" ]; do
+  round=$((round + 1))
+  out=$("${BASH:-bash}" "$here/http-probe" ${probe_args[@]+"${probe_args[@]}"} --log "$log" "$@" 2>&1) || true
+  bad=$(printf '%s\n' "$out" | grep -E ' (FAIL|CHANGED) \(' || true)
+  if [ -z "$bad" ]; then
+    echo "round $round/$rounds: $# ok"
+  else
+    echo "round $round/$rounds:"
+    printf '%s\n' "$bad" | sed 's/^/  /'
+  fi
+
+  persisted=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    url=${line%% *}
+    if printf '%s\n' "$prev_bad" | grep -qxF -- "$url"; then
+      persisted="$persisted$line"$'\n'
+    else
+      blips="$blips  round $round: $line"$'\n'
+    fi
+  done <<EOF
+$bad
+EOF
+  if [ -n "$persisted" ]; then
+    echo "probe-watch: persisted for two consecutive rounds (round $((round - 1))-$round):"
+    printf '%s' "$persisted" | sed 's/^/  /'
+    if printf '%s' "$persisted" | grep -q ' FAIL ('; then exit 1; fi
+    exit 3
+  fi
+  prev_bad=$(printf '%s\n' "$bad" | awk 'NF { print $1 }')
+
+  [ "$round" -lt "$rounds" ] && sleep "$interval"
+done
+
+if [ -n "$blips" ]; then
+  echo "probe-watch: $rounds rounds, nothing persisted; single-round blips:"
+  printf '%s' "$blips"
+else
+  echo "probe-watch: $rounds rounds, all ok"
+fi
+exit 0

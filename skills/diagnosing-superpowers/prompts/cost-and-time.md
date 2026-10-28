@@ -25,7 +25,10 @@ Account for where tokens and wall-clock went.
    dispatching turn for each. If the case file lists a surviving plan ledger
    (`.superpowers/sdd/<plan>/progress.md`), its `Task <N>: complete` lines
    may carry `models:` (model per seat, fix rounds run); cite them to
-   attribute subagent cost to roles.
+   attribute subagent cost to roles. A finished run's ledger survives as an
+   archive under `<git-common-dir>/superpowers/runs/` (written by
+   subagent-driven-development's `scripts/run-summary`); its summary block
+   gives tasks, models per seat, fix rounds, and suite seconds directly.
 6. Report the turns, subagents, tools, or repeats that dominate the
    totals, with numbers. Do not speculate about why a
    turn was expensive beyond what the transcript shows.

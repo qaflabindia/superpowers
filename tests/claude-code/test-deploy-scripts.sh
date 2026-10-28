@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 POLL="$REPO_ROOT/skills/landing-and-deploying/scripts/poll-until"
 PROBE="$REPO_ROOT/skills/verifying-a-deploy/scripts/http-probe"
+WATCH="$REPO_ROOT/skills/verifying-a-deploy/scripts/probe-watch"
 
 FAILURES=0
 TEST_ROOT=""
@@ -89,8 +90,8 @@ test_http_probe() {
     port="$(free_port)"
     python3 -m http.server "$port" --bind 127.0.0.1 --directory "$site" >/dev/null 2>&1 &
     SERVER_PID=$!
-    local i
-    for i in 1 2 3 4 5 6 7 8 9 10; do
+    local _
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
         curl -s -o /dev/null "http://127.0.0.1:$port/health" && break
         sleep 0.5
     done
@@ -116,6 +117,53 @@ test_http_probe() {
         fail "--log appends one six-field line per probe"
         sed 's/^/      /' "$log"
     fi
+
+    # --- baseline comparison ---
+    local slow="$TEST_ROOT/slow.tsv"
+    printf '2026-01-01T00:00:00Z\t%s\t200\t1\t16\tok\n' "$base/health" >"$slow"
+    expect_rc 0 "a tiny baseline time is not compared (noise floor)" "$PROBE" --baseline "$slow" "$base/health"
+    local moved="$TEST_ROOT/moved.tsv"
+    printf '2026-01-01T00:00:00Z\t%s\t301\t5\t0\tok\n' "$base/health" >"$moved"
+    expect_rc 3 "a status that differs from the baseline is CHANGED" "$PROBE" --baseline "$moved" "$base/health"
+    if grep -q "CHANGED (status was 301)" "$TEST_ROOT/out"; then
+        pass "CHANGED names the baseline status"
+    else
+        fail "CHANGED names the baseline status"
+    fi
+    local fast="$TEST_ROOT/fast.tsv"
+    printf '2026-01-01T00:00:00Z\t%s\t200\t20\t16\tok\n' "$base/health" >"$fast"
+    expect_rc 0 "within twice the baseline time is ok" "$PROBE" --baseline "$fast" "$base/health"
+    expect_rc 1 "FAIL beats CHANGED in the exit code" "$PROBE" --baseline "$moved" "$base/health" "$base/missing"
+
+    # --- probe-watch ---
+    local wlog="$TEST_ROOT/watch.tsv"
+    expect_rc 0 "watch: all-ok rounds exit 0" "$WATCH" --rounds 2 --interval 0 --log "$wlog" "$base/health"
+    if grep -q "all ok" "$TEST_ROOT/out" && [[ "$(grep -c '' "$wlog")" -eq 2 ]]; then
+        pass "watch logs every round"
+    else
+        fail "watch logs every round"
+    fi
+    expect_rc 1 "watch: a FAIL in two consecutive rounds stops the watch" \
+        "$WATCH" --rounds 5 --interval 0 --log "$wlog" "$base/missing"
+    if grep -q "round 2/5" "$TEST_ROOT/out" && ! grep -q "round 3/5" "$TEST_ROOT/out"; then
+        pass "watch stops at the second consecutive bad round"
+    else
+        fail "watch stops at the second consecutive bad round"
+    fi
+    expect_rc 3 "watch: persisting CHANGED exits 3" \
+        "$WATCH" --rounds 3 --interval 0 --log "$wlog" --baseline "$moved" "$base/health"
+    # A single bad round is a blip: the file appears after round 1.
+    rm -f "$site/late"
+    ( sleep 1; echo ok >"$site/late" ) &
+    expect_rc 0 "watch: a one-round blip is reported, not alerted" \
+        "$WATCH" --rounds 3 --interval 2 --log "$wlog" "$base/late"
+    if grep -q "single-round blips" "$TEST_ROOT/out"; then
+        pass "watch lists the blip"
+    else
+        fail "watch lists the blip"
+        sed 's/^/      /' "$TEST_ROOT/out"
+    fi
+    expect_rc 2 "watch: --log is required" "$WATCH" "$base/health"
 }
 
 main() {

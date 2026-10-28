@@ -2,69 +2,123 @@
 # Run the project's full test suite once and, if it passes on a clean,
 # committed tree, record which tree it proved. A green run only proves the
 # tree it ran on; recording the tree hash lets a later step that needs a
-# green suite on the same tree (finishing-a-development-branch's Step 1)
-# cite this run instead of re-running the suite, and forces a re-run the
-# moment anything differs.
+# green suite on the same tree (finishing-a-development-branch's Step 1, a
+# new worktree's baseline, landing's readiness report) cite this run instead
+# of re-running the suite, and forces a re-run the moment anything differs.
 #
 # Evidence is recorded only when the working tree is clean before AND after
 # the run (git-ignored files, including the plan workspace, don't count) and
 # HEAD's tree did not change during it. Otherwise the suite still runs and
 # its exit status is still returned, but nothing is recorded.
 #
-# Usage: suite-run PLAN_FILE -- TEST_COMMAND [ARGS...]
+# Evidence goes to two places:
+#   - the plan's ledger (unless PLAN_FILE is "-"), and
+#   - the repository's shared store, <git-common-dir>/superpowers/suite-evidence.tsv,
+#     which every worktree of the repo sees and which outlives the plan
+#     workspace. Lines: <tree> <head7> <seconds> <iso-time> <command> (tabs).
+#
+# Usage: suite-run PLAN_FILE|- -- TEST_COMMAND [ARGS...]
+#        suite-run --lookup [-- TEST_COMMAND [ARGS...]]
+#   --lookup   run nothing: if the working tree is clean and the store holds
+#              green evidence for HEAD's tree (for this command, when one is
+#              given), print it and exit 0; otherwise exit 1.
 # Ledger line on success:
-#   Suite: green on tree <tree-sha> (HEAD <head7>) — <command> → <last line>
+#   Suite: green on tree <tree-sha> (HEAD <head7>, <S>s) — <command> → <last line>
 # Exit: the test command's exit status.
 set -euo pipefail
 
-if [ $# -lt 3 ] || [ "$2" != "--" ]; then
-  echo "usage: suite-run PLAN_FILE -- TEST_COMMAND [ARGS...]" >&2
+usage() {
+  echo "usage: suite-run PLAN_FILE|- -- TEST_COMMAND [ARGS...]" >&2
+  echo "       suite-run --lookup [-- TEST_COMMAND [ARGS...]]" >&2
   exit 2
+}
+
+here="$(cd "$(dirname "$0")" && pwd)"
+common=$(git rev-parse --git-common-dir)
+common=$(cd "$common" && pwd)
+store_dir="$common/superpowers"
+store="$store_dir/suite-evidence.tsv"
+
+# Render a command the way a person would type it.
+render() {
+  local out="" a
+  for a in "$@"; do
+    case "$a" in
+      *[[:space:]\"\;\|\&]*) out="$out '$a'" ;;
+      *) out="$out $a" ;;
+    esac
+  done
+  printf '%s' "${out# }"
+}
+
+if [ "${1:-}" = "--lookup" ]; then
+  shift
+  want=""
+  if [ $# -gt 0 ]; then
+    [ "$1" = "--" ] && [ $# -ge 2 ] || usage
+    shift
+    want=$(render "$@")
+  fi
+  [ -z "$(git status --porcelain)" ] || exit 1
+  [ -f "$store" ] || exit 1
+  tree=$(git rev-parse 'HEAD^{tree}')
+  hit=$(awk -F'\t' -v t="$tree" -v c="$want" '$1 == t && (c == "" || $5 == c) { line = $0 } END { if (line != "") print line }' "$store")
+  [ -n "$hit" ] || exit 1
+  printf '%s\n' "$hit" | awk -F'\t' '{ printf "Suite: green on tree %s (HEAD %s, %ss, %s) — %s\n", $1, $2, $3, $4, $5 }'
+  exit 0
+fi
+
+if [ $# -lt 3 ] || [ "$2" != "--" ]; then
+  usage
 fi
 
 plan=$1
 shift 2
-here="$(cd "$(dirname "$0")" && pwd)"
 
-dir=$("${BASH:-bash}" "$here/sdd-workspace" "$plan")
-ledger="$dir/progress.md"
+if [ "$plan" = "-" ]; then
+  dir="$store_dir"
+  ledger=""
+else
+  dir=$("${BASH:-bash}" "$here/sdd-workspace" "$plan")
+  ledger="$dir/progress.md"
+fi
+mkdir -p "$dir"
 
 tree_before=$(git rev-parse 'HEAD^{tree}')
 dirty_before=$(git status --porcelain)
 log="$dir/suite-$(printf '%.7s' "$tree_before").log"
-
-# Render the command the way a person would type it, for the ledger line.
-cmd=""
-for a in "$@"; do
-  case "$a" in
-    *[[:space:]\"\;\|\&]*) cmd="$cmd '$a'" ;;
-    *) cmd="$cmd $a" ;;
-  esac
-done
-cmd=${cmd# }
+cmd=$(render "$@")
 
 rc=0
+start=$(date +%s)
 "$@" > "$log" 2>&1 || rc=$?
+secs=$(( $(date +%s) - start ))
 
 tail -n 5 "$log"
 if [ "$rc" -ne 0 ]; then
-  echo "suite-run: test command exited $rc; nothing recorded (full output: $log)" >&2
+  echo "suite-run: test command exited $rc after ${secs}s; nothing recorded (full output: $log)" >&2
   exit "$rc"
 fi
 
 tree_after=$(git rev-parse 'HEAD^{tree}')
 dirty_after=$(git status --porcelain)
 if [ -n "$dirty_before" ] || [ -n "$dirty_after" ]; then
-  echo "suite-run: suite passed, but the working tree has uncommitted changes; no tree evidence recorded" >&2
+  echo "suite-run: suite passed in ${secs}s, but the working tree has uncommitted changes; no tree evidence recorded" >&2
   exit 0
 fi
 if [ "$tree_before" != "$tree_after" ]; then
-  echo "suite-run: suite passed, but HEAD's tree changed during the run; no tree evidence recorded" >&2
+  echo "suite-run: suite passed in ${secs}s, but HEAD's tree changed during the run; no tree evidence recorded" >&2
   exit 0
 fi
 
+head7=$(git rev-parse --short=7 HEAD)
+mkdir -p "$store_dir"
+printf '%s\t%s\t%s\t%s\t%s\n' "$tree_after" "$head7" "$secs" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cmd" >> "$store"
+
 last=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1) || last="(no output)"
-[ -f "$ledger" ] || printf '# SDD ledger — plan: %s\n' "$plan" > "$ledger"
-line="Suite: green on tree $tree_after (HEAD $(git rev-parse --short=7 HEAD)) — $cmd → $last"
-printf '%s\n' "$line" >> "$ledger"
+line="Suite: green on tree $tree_after (HEAD $head7, ${secs}s) — $cmd → $last"
+if [ -n "$ledger" ]; then
+  [ -f "$ledger" ] || printf '# SDD ledger — plan: %s\n' "$plan" > "$ledger"
+  printf '%s\n' "$line" >> "$ledger"
+fi
 echo "evidence: $line"

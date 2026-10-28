@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Summarise a plan's ledger before the workspace is deleted, and archive it
+# where it outlives the workspace: <git-common-dir>/superpowers/runs/. The
+# archive holds the summary plus the whole ledger, so a later cost or
+# behaviour diagnosis (superpowers:diagnosing-superpowers) still has the
+# per-task models, fix rounds, suite runs, and rulings of a finished run.
+#
+# Reads the completion lines both executors write:
+#   Task <N>: complete (commits a..b, review clean; models: impl <m>, review <m>, rounds <R>)
+#   Task <N>: complete (commits a..b, tests: <cmd> → <last line>)
+# the `Suite: green on tree` lines from suite-run, and task-verify's
+# `tests verified` lines (re-run, or reused a recorded green run).
+#
+# Usage: run-summary PLAN_FILE
+# Prints the summary (for the final message) and the archive path.
+set -euo pipefail
+
+[ $# -eq 1 ] || { echo "usage: run-summary PLAN_FILE" >&2; exit 2; }
+plan=$1
+here="$(cd "$(dirname "$0")" && pwd)"
+dir=$("${BASH:-bash}" "$here/sdd-workspace" "$plan")
+ledger="$dir/progress.md"
+[ -f "$ledger" ] || { echo "run-summary: no ledger at $ledger" >&2; exit 1; }
+
+summary=$(awk -v plan="$plan" '
+  /^Task [0-9]+: complete/ {
+    tasks++
+    if ($0 ~ /parked/) parked++
+    if (match($0, /models: [^)]*/)) {
+      m = substr($0, RSTART + 8, RLENGTH - 8)
+      n = split(m, parts, /, /)
+      for (i = 1; i <= n; i++) {
+        p = parts[i]
+        if (p ~ /^rounds /) {
+          r = substr(p, 8) + 0
+          rounds += r
+          if (r > maxr) { maxr = r; maxtask = $2; sub(/:$/, "", maxtask) }
+        } else {
+          seats[p]++
+        }
+      }
+    }
+  }
+  /^Suite: green on tree/ {
+    suites++
+    if (match($0, /, [0-9]+s\)/)) secs += substr($0, RSTART + 2, RLENGTH - 4) + 0
+    lastsuite = $0
+  }
+  /^Task [0-9]+: tests verified at/ {
+    if ($0 ~ /→ reused: /) reused++; else reran++
+  }
+  /Ruling:/ { rulings++ }
+  /minor \(deferred\)/ { minors++ }
+  END {
+    printf "Run summary — plan: %s\n", plan
+    printf "Tasks: %d complete", tasks + 0
+    if (parked) printf " (%d with parked findings)", parked
+    printf "\n"
+    if (tasks) {
+      printf "Fix rounds: %d total", rounds + 0
+      if (maxr) printf " (most: %d on Task %s)", maxr, maxtask
+      printf "\n"
+    }
+    sep = ""; line = ""
+    for (s in seats) { line = line sep s " ×" seats[s]; sep = ", " }
+    if (line != "") printf "Models: %s\n", line
+    printf "Suite runs recorded: %d (%ds total)\n", suites + 0, secs + 0
+    if (reused + reran) printf "Task verifications: %d re-ran tests, %d reused a recorded green run\n", reran + 0, reused + 0
+    printf "Rulings: %d; deferred minors: %d\n", rulings + 0, minors + 0
+    if (lastsuite != "") printf "Last: %s\n", lastsuite
+  }' "$ledger")
+
+common=$(git rev-parse --git-common-dir)
+common=$(cd "$common" && pwd)
+runs="$common/superpowers/runs"
+mkdir -p "$runs"
+stem=$(basename "$plan")
+stem=${stem%.*}
+archive="$runs/$stem-$(date -u +%Y%m%dT%H%M%SZ).md"
+{
+  printf '%s\n\n## Ledger\n\n' "$summary"
+  cat "$ledger"
+} > "$archive"
+
+printf '%s\n' "$summary"
+echo "Archived: $archive"

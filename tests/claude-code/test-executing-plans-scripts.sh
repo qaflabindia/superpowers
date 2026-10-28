@@ -162,8 +162,8 @@ PLAN
     tree="$(cd "$repo" && git rev-parse 'HEAD^{tree}')"
     rc=0
     out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" plan.md -- sh -c 'echo "12 passed"' 2>&1)" || rc=$?
-    local expected3="Suite: green on tree $tree (HEAD ${head2:0:7}) — sh -c 'echo \"12 passed\"' → 12 passed"
-    if [[ "$rc" -eq 0 ]] && grep -qF "$expected3" "$ledger"; then
+    local expected3="Suite: green on tree $tree (HEAD ${head2:0:7}, [0-9]+s) — sh -c 'echo \"12 passed\"' → 12 passed"
+    if [[ "$rc" -eq 0 ]] && grep -q "^Suite: green on tree $tree (HEAD ${head2:0:7}, [0-9]*s) — sh -c 'echo \"12 passed\"' → 12 passed\$" "$ledger"; then
         pass "suite-run records the tree a green suite ran on"
     else
         fail "suite-run records the tree a green suite ran on (rc=$rc)"
@@ -268,6 +268,83 @@ PLAN
         echo "    ledger:"; sed 's/^/      /' "$ledger" 2>/dev/null || echo "      (missing)"
     fi
     ( cd "$repo" && git worktree remove --force "$wt" )
+
+    # --- suite-run --lookup: shared store outlives the ledger, keyed by tree ---
+    local store
+    store="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd)/superpowers/suite-evidence.tsv"
+    if [[ -f "$store" ]] && grep -q "^$tree"$'\t' "$store"; then
+        pass "suite-run writes green evidence to the shared store"
+    else
+        fail "suite-run writes green evidence to the shared store"
+    fi
+    rc=0
+    out="$(cd "$repo" && git checkout -q "$head2" 2>/dev/null && "$SDD_SCRIPTS/suite-run" --lookup -- sh -c 'echo "12 passed"' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 0 && "$out" == "Suite: green on tree $tree"* ]]; then
+        pass "suite-run --lookup finds evidence for the current tree and command"
+    else
+        fail "suite-run --lookup finds evidence for the current tree and command (rc=$rc)"
+        echo "    got: $out"
+    fi
+    rc=0
+    ( cd "$repo" && "$SDD_SCRIPTS/suite-run" --lookup -- other-command >/dev/null 2>&1 ) || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+        pass "suite-run --lookup misses for a different command"
+    else
+        fail "suite-run --lookup misses for a different command (rc=$rc)"
+    fi
+    ( cd "$repo" && echo dirty >> work.txt )
+    rc=0
+    ( cd "$repo" && "$SDD_SCRIPTS/suite-run" --lookup >/dev/null 2>&1 ) || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+        pass "suite-run --lookup refuses a dirty working tree"
+    else
+        fail "suite-run --lookup refuses a dirty working tree (rc=$rc)"
+    fi
+    ( cd "$repo" && git checkout -q -- work.txt )
+    local before_store
+    before_store="$(grep -c '' "$store")"
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" - -- sh -c 'echo "3 passed"' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 0 && "$(grep -c '' "$store")" -eq $((before_store + 1)) && "$out" == *"evidence: Suite: green"* ]]; then
+        pass "suite-run - records to the shared store without a plan"
+    else
+        fail "suite-run - records to the shared store without a plan (rc=$rc)"
+        echo "    got: $out"
+    fi
+
+    # --- task-verify: reuses suite-run evidence for the same tree + command ---
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/task-verify" plan.md 9 -- sh -c 'echo "3 passed"' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 0 ]] && grep -q "^Task 9: tests verified at .* → reused: green on tree $tree" "$ledger" \
+        && [[ ! -e "$repo/.superpowers/sdd/plan/task-9-verify-${head2:0:7}.log" ]]; then
+        pass "task-verify cites a recorded green run instead of re-running"
+    else
+        fail "task-verify cites a recorded green run instead of re-running (rc=$rc)"
+        echo "    got: $out"
+    fi
+
+    # --- run-summary: summarises and archives the ledger past the workspace ---
+    printf '%s\n' \
+        "Task 7: complete (commits aaaaaaa..bbbbbbb, review clean; models: impl haiku, review sonnet, rounds 0)" \
+        "Task 8: complete (commits bbbbbbb..ccccccc, 1 parked; models: impl haiku→sonnet, review sonnet, rounds 5)" \
+        "Ruling: plan said X, spec says Y — followed spec" \
+        "Task 8: minor (deferred) — naming" >> "$ledger"
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/run-summary" plan.md 2>&1)" || rc=$?
+    local archive
+    archive="$(printf '%s\n' "$out" | sed -n 's/^Archived: //p')"
+    if [[ "$rc" -eq 0 ]] \
+        && [[ "$out" == *"Fix rounds: 5 total (most: 5 on Task 8)"* ]] \
+        && [[ "$out" == *"1 with parked findings"* ]] \
+        && [[ "$out" == *"impl haiku ×1"* && "$out" == *"review sonnet ×2"* ]] \
+        && [[ "$out" == *"Rulings: 1; deferred minors: 1"* ]] \
+        && [[ "$out" == *"Task verifications: "*" re-ran tests, 1 reused a recorded green run"* ]] \
+        && [[ -f "$archive" ]] && grep -qF "Task 8: minor (deferred)" "$archive"; then
+        pass "run-summary reports models, rounds, rulings and archives the ledger"
+    else
+        fail "run-summary reports models, rounds, rulings and archives the ledger (rc=$rc)"
+        echo "    got: $out"
+    fi
 
     echo
     if [[ "$FAILURES" -eq 0 ]]; then

@@ -210,7 +210,9 @@ and fix-round diffs need it.
   pre-flight and follow it — separate worktrees, a review per task, landing
   in task order.
 
-Template: [implementer-prompt.md](implementer-prompt.md)
+Template: [implementer-prompt.md](implementer-prompt.md). Fill `[SUITE_POLICY]`
+from the suite budget you set at pre-flight
+([references/suite-budget.md](references/suite-budget.md)).
 
 ### 2. Handle the report
 

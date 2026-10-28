@@ -140,7 +140,7 @@ if [[ "$FORMAT" == "zip" ]]; then
   command -v unzip >/dev/null || die "unzip not found in PATH"
 fi
 
-[[ -d "$REPO_ROOT/.git" ]] || die "repo root is not a git checkout: $REPO_ROOT"
+[[ -e "$REPO_ROOT/.git" ]] || die "repo root is not a git checkout: $REPO_ROOT"
 git -C "$REPO_ROOT" rev-parse --verify "$REF^{commit}" >/dev/null ||
   die "git ref does not resolve to a commit: $REF"
 
@@ -291,12 +291,14 @@ metadata_count="$(find "$STAGE/skills" -path '*/agents/openai.yaml' -type f | wc
 
 case "$FORMAT" in
   zip)
-    # ZIP cannot represent dates earlier than 1980.
+    # ZIP cannot represent dates earlier than 1980, and stores local time:
+    # touch and zip both run in UTC so the entries read 1980-01-01 00:00
+    # wherever the archive is built.
     TZ=UTC find "$STAGE" -exec touch -t 198001010000 {} +
     (
       cd "$STAGE"
       rm -f "$OUTPUT"
-      COPYFILE_DISABLE=1 zip -X -q - -@ <"$ARCHIVE_LIST" >"$OUTPUT"
+      TZ=UTC COPYFILE_DISABLE=1 zip -X -q - -@ <"$ARCHIVE_LIST" >"$OUTPUT"
     )
     ;;
   tar.gz)

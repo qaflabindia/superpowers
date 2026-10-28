@@ -37,14 +37,15 @@ fail_pattern=""
 pending_exits=""
 
 is_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+need_num() { if [ "$1" -lt 2 ] || ! is_num "$2"; then usage; fi; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --interval) [ $# -ge 2 ] && is_num "$2" || usage; interval=$2; shift 2 ;;
-    --timeout) [ $# -ge 2 ] && is_num "$2" || usage; timeout=$2; shift 2 ;;
-    --every) [ $# -ge 2 ] && is_num "$2" || usage; every=$2; shift 2 ;;
+    --interval) need_num $# "${2:-}"; interval=$2; shift 2 ;;
+    --timeout) need_num $# "${2:-}"; timeout=$2; shift 2 ;;
+    --every) need_num $# "${2:-}"; every=$2; shift 2 ;;
     --fail-pattern) [ $# -ge 2 ] || usage; fail_pattern=$2; shift 2 ;;
-    --pending-exit) [ $# -ge 2 ] && is_num "$2" || usage; pending_exits="$pending_exits $2 "; shift 2 ;;
+    --pending-exit) need_num $# "${2:-}"; pending_exits="$pending_exits $2 "; shift 2 ;;
     --) shift; break ;;
     *) usage ;;
   esac

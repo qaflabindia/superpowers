@@ -25,8 +25,11 @@ git status --porcelain        # must print nothing
 ```
 
 Both hold: that run proved the tree you are about to integrate. Quote the
-line as your evidence and continue to Step 2. Either fails, or there is no
-such line: run the suite.
+line as your evidence and continue to Step 2. No line in this session? The
+repository's shared store may still hold one: `bash
+<subagent-driven-development>/scripts/suite-run --lookup -- <full test command>`
+prints it and exits 0 only for this exact tree on a clean worktree. Neither
+holds: run the suite.
 
 **If tests fail**, report the failures and stop — the menu comes after a green suite:
 

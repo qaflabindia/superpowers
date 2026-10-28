@@ -46,16 +46,26 @@ Keep artifacts in `.superpowers/deploy/<environment>/`, and make sure
 
 ## Modes
 
-**Baseline (before deploying).** Run every check once, with `--log` into
-`baseline.tsv`, and record error counts and page notes beside it. Without a
-baseline, a post-deploy run is a health check, not a comparison; say so.
+**Baseline (before deploying).** Run every check once, with
+`http-probe --log baseline.tsv`, and record error counts and page notes
+beside it. Without a baseline, a post-deploy run is a health check, not a
+comparison; say so.
 
 **Quick (right after deploying, the default).** Wait until the version check
 shows the new release (`poll-until` from superpowers:landing-and-deploying,
-bounded), then run every check once and compare against the baseline.
+bounded), then run every check once and compare against the baseline:
+`http-probe --baseline baseline.tsv --log quick.tsv <urls>` marks each URL
+ok, FAIL, or CHANGED (a different status, or over twice the baseline time)
+and exits 0, 1, or 3.
 
 **Watch (on request, or after a risky change).** Repeat the checks every
-minute for the agreed window (default 10 minutes), logging each round.
+minute for the agreed window (default 10 minutes):
+`scripts/probe-watch --rounds 10 --interval 60 --log watch.tsv --baseline baseline.tsv <urls>`.
+It prints a line per round, stops as soon as a finding persists for two
+rounds (exit 1 for FAIL, 3 for CHANGED), and lists single-round blips at
+the end. Keep each call under your harness's command time limit — fewer
+rounds per call, or run it in the background. Re-run the other checks
+(errors, pages) at the same rhythm by hand.
 
 ## Judging results
 

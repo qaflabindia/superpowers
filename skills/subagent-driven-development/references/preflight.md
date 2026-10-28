@@ -33,6 +33,9 @@ against the files it later touches.
   first step. A self-inconsistent brief is ruled on and ledgered exactly
   like a pre-flight row.
 
+Under subagent-driven-development, then set the suite budget
+([suite-budget.md](suite-budget.md)) and ledger it.
+
 Write the table to the ledger. Rule on each conflict it surfaces — the spec
 is the binding authority, the plan is its argument — and record each
 ruling beside its row. If the scan is clean, proceed without comment. The

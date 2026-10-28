@@ -8,12 +8,18 @@
 # Records a ledger line on success — never a completion line: the task is not
 # complete until its review is clean.
 #
+# No re-run when suite-run already proved this command green on DIR's exact
+# tree (clean working tree, same command, in the repository's shared store):
+# that record was written by the script on that tree, not claimed in a
+# report, so the line cites it instead.
+#
 # Usage: task-verify [-C DIR] PLAN_FILE TASK_NUMBER -- TEST_COMMAND [ARGS...]
 #   -C DIR runs the command in DIR (a parallel-wave task's worktree) and
 #   records DIR's HEAD, while the ledger stays in the plan workspace of the
 #   checkout you run this from.
 # Ledger line on success:
 #   Task <N>: tests verified at <head7> — <command> → <last line>
+#   Task <N>: tests verified at <head7> — <command> → reused: green on tree …
 # Exit: the test command's exit status.
 set -euo pipefail
 
@@ -51,6 +57,15 @@ for a in "$@"; do
   esac
 done
 cmd=${cmd# }
+
+hit=$(cd "$run_dir" && "${BASH:-bash}" "$here/suite-run" --lookup -- "$@" 2>/dev/null) || hit=""
+if [ -n "$hit" ]; then
+  [ -f "$ledger" ] || printf '# SDD ledger — plan: %s\n' "$plan" > "$ledger"
+  line="Task $n: tests verified at $head — $cmd → reused: ${hit#Suite: }"
+  printf '%s\n' "$line" >> "$ledger"
+  echo "ledger: $line"
+  exit 0
+fi
 
 rc=0
 (cd "$run_dir" && "$@") > "$log" 2>&1 || rc=$?

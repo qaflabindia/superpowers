@@ -125,12 +125,23 @@ in the diff before Task 1 starts.
 
 ## Step 3: Verify Clean Baseline
 
-Run tests to ensure workspace starts clean:
+Run tests to ensure workspace starts clean, through
+subagent-driven-development's `scripts/suite-run` so the result is recorded
+for this tree and its duration sets the plan's suite budget:
 
 ```bash
-# Use project-appropriate command
-npm test / cargo test / pytest / go test ./...
+# Already proved green on this exact tree (e.g. the base hasn't moved since
+# the last finished branch)? This prints the record and exits 0 — cite it.
+bash <subagent-driven-development>/scripts/suite-run --lookup -- <test command>
+# Otherwise run it (project-appropriate command):
+bash <subagent-driven-development>/scripts/suite-run - -- npm test   # / cargo test / pytest / go test ./...
 ```
+
+Without bash, run the test command directly.
+
+A lookup hit proves the code, not this worktree's fresh install. If the
+dependency install in Step 2 printed warnings or errors, run the suite
+anyway.
 
 **If tests fail:** Report failures, ask whether to proceed or investigate.
 
