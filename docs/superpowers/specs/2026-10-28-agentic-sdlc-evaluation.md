@@ -166,4 +166,13 @@ The writing-plans handoff makes the real choice. Making SDD's description match 
 | 6 | F7 (parallel waves) | New quorum scenario: serial vs waves | High |
 | n/a | F10, F11 | Separate plugin / later | n/a |
 
+**Implementation status (this branch):**
+- Steps 1–2 (F1–F4, F8) are done.
+- Step 3 (F5) is done:
+  - `subagent-driven-development/scripts/suite-run` records `Suite: green on tree <T>`, but only for a green run on a tree that is clean and unchanged after the run.
+  - `references/finish.md` makes the executor's own full-suite run the final check, then carries that line forward.
+  - finishing Step 1 cites the line instead of re-running when `HEAD^{tree}` matches and the worktree is clean.
+  - This also covers the final-tree part of F6: the controller now runs the suite itself before finishing. F6's per-task check is still open.
+- No behaviour evals have been run for any of this.
+
 **For sending changes upstream:** AGENTS.md requires one problem per PR, a problem your human partner actually hit, a search for duplicate PRs, and eval evidence for skill-content changes. F1 and F4 are the most defensible as standalone bug fixes, and only if you have hit them in a real session. F5–F7 are design changes and should start as an issue or discussion, not a PR.

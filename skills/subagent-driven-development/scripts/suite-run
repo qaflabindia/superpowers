@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Run the project's full test suite once and, if it passes on a clean,
+# committed tree, record which tree it proved. A green run only proves the
+# tree it ran on; recording the tree hash lets a later step that needs a
+# green suite on the same tree (finishing-a-development-branch's Step 1)
+# cite this run instead of re-running the suite, and forces a re-run the
+# moment anything differs.
+#
+# Evidence is recorded only when the working tree is clean before AND after
+# the run (git-ignored files, including the plan workspace, don't count) and
+# HEAD's tree did not change during it. Otherwise the suite still runs and
+# its exit status is still returned, but nothing is recorded.
+#
+# Usage: suite-run PLAN_FILE -- TEST_COMMAND [ARGS...]
+# Ledger line on success:
+#   Suite: green on tree <tree-sha> (HEAD <head7>) — <command> → <last line>
+# Exit: the test command's exit status.
+set -euo pipefail
+
+if [ $# -lt 3 ] || [ "$2" != "--" ]; then
+  echo "usage: suite-run PLAN_FILE -- TEST_COMMAND [ARGS...]" >&2
+  exit 2
+fi
+
+plan=$1
+shift 2
+here="$(cd "$(dirname "$0")" && pwd)"
+
+dir=$("${BASH:-bash}" "$here/sdd-workspace" "$plan")
+ledger="$dir/progress.md"
+
+tree_before=$(git rev-parse 'HEAD^{tree}')
+dirty_before=$(git status --porcelain)
+log="$dir/suite-$(printf '%.7s' "$tree_before").log"
+
+# Render the command the way a person would type it, for the ledger line.
+cmd=""
+for a in "$@"; do
+  case "$a" in
+    *[[:space:]\"\;\|\&]*) cmd="$cmd '$a'" ;;
+    *) cmd="$cmd $a" ;;
+  esac
+done
+cmd=${cmd# }
+
+rc=0
+"$@" > "$log" 2>&1 || rc=$?
+
+tail -n 5 "$log"
+if [ "$rc" -ne 0 ]; then
+  echo "suite-run: test command exited $rc; nothing recorded (full output: $log)" >&2
+  exit "$rc"
+fi
+
+tree_after=$(git rev-parse 'HEAD^{tree}')
+dirty_after=$(git status --porcelain)
+if [ -n "$dirty_before" ] || [ -n "$dirty_after" ]; then
+  echo "suite-run: suite passed, but the working tree has uncommitted changes; no tree evidence recorded" >&2
+  exit 0
+fi
+if [ "$tree_before" != "$tree_after" ]; then
+  echo "suite-run: suite passed, but HEAD's tree changed during the run; no tree evidence recorded" >&2
+  exit 0
+fi
+
+last=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1) || last="(no output)"
+[ -f "$ledger" ] || printf '# SDD ledger — plan: %s\n' "$plan" > "$ledger"
+line="Suite: green on tree $tree_after (HEAD $(git rev-parse --short=7 HEAD)) — $cmd → $last"
+printf '%s\n' "$line" >> "$ledger"
+echo "evidence: $line"

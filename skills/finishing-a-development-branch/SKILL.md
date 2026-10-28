@@ -15,6 +15,19 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 Run the project's full test suite (`npm test` / `cargo test` / `pytest` / `go test ./...`).
 
+**One exception — a green run on this exact tree.** If this session holds
+a `Suite: green on tree <T>` line (written by subagent-driven-development's
+`scripts/suite-run`, carried in the executor's "Suite evidence"), check it:
+
+```bash
+git rev-parse 'HEAD^{tree}'   # must print exactly <T>
+git status --porcelain        # must print nothing
+```
+
+Both hold: that run proved the tree you are about to integrate. Quote the
+line as your evidence and continue to Step 2. Either fails, or there is no
+such line: run the suite.
+
 **If tests fail**, report the failures and stop — the menu comes after a green suite:
 
 ```
@@ -214,7 +227,7 @@ place. If your platform provides a workspace-exit tool, use it.
 
 | Excuse | Reality |
 |--------|---------|
-| "Tests passed earlier this session" | Run the suite on the tree you are about to integrate. A green run only proves the tree it ran on. |
+| "Tests passed earlier this session" | A green run only proves the tree it ran on. Only a `Suite: green on tree <T>` line whose `<T>` equals `HEAD^{tree}` on a clean worktree counts; anything else, run the suite. |
 | "They obviously want it merged" | Integration is your human partner's decision. Present the menu and wait. |
 | "They seem done with this feature — I'll offer to discard it" | The menu is complete as written. Discard happens only when your human partner asks for it in so many words. |
 | "'Yeah, get rid of it' counts as confirmation" | Only the typed word `discard` authorizes deletion. |

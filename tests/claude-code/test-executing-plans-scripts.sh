@@ -2,12 +2,14 @@
 # Tests for executing-plans' bookkeeping helpers: scripts/task-start extracts
 # the brief and records BASE in one call; scripts/task-done runs the task's
 # test command, records the result in the ledger, and refuses to record a
-# failing task.
+# failing task; scripts/suite-run (shared with SDD) records tree-keyed suite
+# evidence only for a green run on a clean, unchanged tree.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 EP_SCRIPTS="$REPO_ROOT/skills/executing-plans/scripts"
+SDD_SCRIPTS="$REPO_ROOT/skills/subagent-driven-development/scripts"
 
 FAILURES=0
 TEST_ROOT=""
@@ -153,6 +155,60 @@ PLAN
         echo "    expected: $expected2"
         echo "    ledger:"; sed 's/^/      /' "$ledger" 2>/dev/null || echo "      (missing)"
     fi
+
+    # --- suite-run: records tree-keyed evidence for a green run on a clean tree ---
+    local tree
+    tree="$(cd "$repo" && git rev-parse 'HEAD^{tree}')"
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" plan.md -- sh -c 'echo "12 passed"' 2>&1)" || rc=$?
+    local expected3="Suite: green on tree $tree (HEAD ${head2:0:7}) — sh -c 'echo \"12 passed\"' → 12 passed"
+    if [[ "$rc" -eq 0 ]] && grep -qF "$expected3" "$ledger"; then
+        pass "suite-run records the tree a green suite ran on"
+    else
+        fail "suite-run records the tree a green suite ran on (rc=$rc)"
+        echo "    expected: $expected3"
+        echo "    ledger:"; sed 's/^/      /' "$ledger" 2>/dev/null || echo "      (missing)"
+    fi
+    if [[ -s "$repo/.superpowers/sdd/plan/suite-${tree:0:7}.log" ]]; then
+        pass "suite-run keeps the full suite output in the workspace"
+    else
+        fail "suite-run keeps the full suite output in the workspace"
+    fi
+
+    # --- suite-run: a red suite records nothing and returns its status ---
+    local before
+    before="$(grep -c '^Suite:' "$ledger")"
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" plan.md -- sh -c 'echo "1 failed"; exit 3' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 3 ]] && [[ "$(grep -c '^Suite:' "$ledger")" -eq "$before" ]]; then
+        pass "suite-run returns the failing status and records nothing"
+    else
+        fail "suite-run returns the failing status and records nothing (rc=$rc)"
+    fi
+
+    # --- suite-run: uncommitted changes mean no tree evidence ---
+    ( cd "$repo" && echo dirty >> work.txt )
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" plan.md -- true 2>&1)" || rc=$?
+    if [[ "$rc" -eq 0 ]] && [[ "$(grep -c '^Suite:' "$ledger")" -eq "$before" ]] \
+        && [[ "$out" == *"uncommitted changes"* ]]; then
+        pass "suite-run records no evidence for a dirty working tree"
+    else
+        fail "suite-run records no evidence for a dirty working tree (rc=$rc)"
+        echo "    got: $out"
+    fi
+    ( cd "$repo" && git checkout -q -- work.txt )
+
+    # --- suite-run: a suite that changes tracked files proves nothing ---
+    rc=0
+    out="$(cd "$repo" && "$SDD_SCRIPTS/suite-run" plan.md -- sh -c 'echo mutated >> work.txt' 2>&1)" || rc=$?
+    if [[ "$rc" -eq 0 ]] && [[ "$(grep -c '^Suite:' "$ledger")" -eq "$before" ]]; then
+        pass "suite-run records no evidence when the run dirtied the tree"
+    else
+        fail "suite-run records no evidence when the run dirtied the tree (rc=$rc)"
+        echo "    got: $out"
+    fi
+    ( cd "$repo" && git checkout -q -- work.txt )
 
     echo
     if [[ "$FAILURES" -eq 0 ]]; then

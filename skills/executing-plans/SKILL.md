@@ -246,7 +246,11 @@ second reviewer: write the test that reproduces the finding, watch it
 fail, make it pass, then run the whole suite. Record each in the ledger as
 `Final: fixed <finding> — <test name> RED→GREEN, suite <N>/<N>`. A fix
 without a test that failed first is not verified; a suite that is not
-green after the pass means the pass is not over. Do not dispatch a
+green after the pass means the pass is not over. Commit the last fix, then
+make the pass's final suite run
+`../subagent-driven-development/scripts/suite-run PLAN_FILE -- <suite command>`:
+it records the tree it proved, so finish and finishing-a-development-branch
+reuse that run instead of repeating it. Do not dispatch a
 re-review: it would re-read a diff whose covering tests already answer
 "addressed" and whose suite run already answers "broke nothing".
 
